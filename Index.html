@@ -1,0 +1,403 @@
+```html
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>SNÖ PATRULLEN - 80-tals Arkadskidspel</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Rubik:ital,wght@0,700;0,900;1,900&display=swap" rel="stylesheet">
+    <style>
+        /* Retro 80-tals stil och anpassade effekter */
+        :root {
+            --neon-pink: #ff2a85;
+            --neon-cyan: #00f0ff;
+            --neon-yellow: #ffe600;
+            --retro-purple: #2b1055;
+            --snow-white: #f4f9ff;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #0d0821;
+            color: #fff;
+            font-family: 'Rubik', sans-serif;
+            overflow: hidden;
+            touch-action: none;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        .font-pixel {
+            font-family: 'Press Start 2P', monospace;
+        }
+
+        /* 80-tals krom/neon-logotyp */
+        .retro-logo {
+            background: linear-gradient(180deg, #00f0ff 0%, #ffffff 45%, #ff2a85 50%, #ffe600 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            filter: drop-shadow(0px 4px 0px #2b1055) drop-shadow(0px 0px 15px rgba(255, 42, 133, 0.7));
+            transform: skew(-6deg);
+        }
+
+        .retro-box {
+            background: rgba(19, 12, 46, 0.92);
+            border: 3px solid #00f0ff;
+            box-shadow: 0 0 20px rgba(0, 240, 255, 0.35), inset 0 0 15px rgba(255, 42, 133, 0.25);
+        }
+
+        .retro-btn {
+            background: linear-gradient(180deg, #ff2a85 0%, #b80d57 100%);
+            border: 2px solid #ffe600;
+            box-shadow: 0 4px 0 #590429, 0 0 12px rgba(255, 42, 133, 0.6);
+            transition: transform 0.08s ease, box-shadow 0.08s ease, filter 0.15s ease;
+        }
+
+        .retro-btn:hover {
+            filter: brightness(1.12);
+            transform: translateY(-1px);
+        }
+
+        .retro-btn:active {
+            transform: translateY(3px);
+            box-shadow: 0 1px 0 #590429;
+        }
+
+        .chaser-card {
+            background: rgba(36, 21, 82, 0.85);
+            border: 2px solid #4a358f;
+            transition: all 0.15s ease;
+        }
+
+        .chaser-card.selected {
+            border-color: #ffe600;
+            background: rgba(255, 42, 133, 0.28);
+            box-shadow: 0 0 15px rgba(255, 230, 0, 0.5);
+            transform: scale(1.03);
+        }
+
+        /* Subtil CRT-scanline effekt */
+        .scanlines {
+            background: linear-gradient(
+                rgba(18, 16, 16, 0) 50%, 
+                rgba(0, 0, 0, 0.14) 50%
+            );
+            background-size: 100% 4px;
+            pointer-events: none;
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+
+        @keyframes pulseWarning {
+            0%, 100% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.08); opacity: 0.85; }
+        }
+
+        .warning-banner {
+            animation: pulseWarning 0.45s infinite;
+        }
+    </style>
+</head>
+<body class="w-screen h-screen flex flex-col items-center justify-center relative">
+
+    <!-- Spelcanvas -->
+    <canvas id="gameCanvas" class="absolute inset-0 z-0"></canvas>
+
+    <!-- Retro Scanlines Overlay -->
+    <div class="scanlines fixed inset-0 z-10"></div>
+
+    <!-- Topp HUD (Visas under spel) -->
+    <div id="hud" class="hidden fixed top-0 left-0 right-0 z-20 p-2 sm:p-4 flex flex-col gap-1.5 pointer-events-none">
+        <div class="flex items-stretch justify-between gap-1.5 w-full">
+            <!-- Vänster: Titel & Liv -->
+            <div class="flex flex-col justify-center bg-[#130c2e]/85 border-2 border-[#00f0ff] rounded-xl px-2.5 py-1.5 shadow-lg pointer-events-auto shrink-0">
+                <div class="font-pixel text-[8px] sm:text-xs text-[#00f0ff] tracking-wider">SNÖ PATRULLEN</div>
+                <div class="flex items-center gap-2 mt-1">
+                    <div id="heartsDisplay" class="text-sm sm:text-xl leading-none tracking-wider">❤️❤️❤️</div>
+                    <!-- Turbo / Boost Mätare -->
+                    <div class="hidden sm:flex flex-col ml-1">
+                        <span class="font-pixel text-[8px] text-[#ffe600] mb-1">BULL-TURBO</span>
+                        <div class="w-24 h-3 bg-gray-900 border border-[#ffe600] rounded-full overflow-hidden">
+                            <div id="turboBar" class="h-full bg-gradient-to-r from-[#ff2a85] to-[#ffe600] w-0 transition-all duration-100"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Höger: Poäng, Distans & Ljud -->
+            <div class="flex items-center gap-1.5 sm:gap-3 bg-[#130c2e]/85 border-2 border-[#ff2a85] rounded-xl px-2.5 py-1.5 shadow-lg pointer-events-auto">
+                <div class="text-right">
+                    <div id="slopeBadge" class="inline-block px-1.5 py-0.5 rounded bg-green-600 text-white font-pixel text-[7px] sm:text-[8px] mb-0.5">🟢 LILLVALLEN</div>
+                    <div class="font-pixel text-[8px] sm:text-[10px] text-[#ffe600]">POÄNG: <span id="scoreDisplay" class="text-white">0</span></div>
+                    <div class="font-pixel text-[8px] sm:text-[10px] text-[#00f0ff] mt-0.5">KVAR: <span id="distDisplay" class="text-white">300m</span></div>
+                </div>
+                <div class="flex flex-col sm:flex-row gap-1">
+                    <button id="muteBtn" class="p-1.5 sm:p-2 rounded-lg bg-[#2b1055] border border-[#00f0ff] text-xs sm:text-base text-white hover:bg-[#3e197a] active:scale-95 transition" title="Ljud På/Av">
+                        🔊
+                    </button>
+                    <button id="pauseBtn" class="p-1.5 sm:p-2 rounded-lg bg-[#2b1055] border border-[#ffe600] text-xs sm:text-base text-white hover:bg-[#3e197a] active:scale-95 transition" title="Pausa">
+                        ⏸️
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Mitten: Varning / Jaktstatus med nedräkning -->
+        <div id="chaseStatusBox" class="hidden self-center bg-[#b80d57]/95 border-2 border-[#ffe600] rounded-xl px-3 py-1 shadow-lg text-center warning-banner max-w-full sm:min-w-[260px]">
+            <div id="chaseStatusTitle" class="font-pixel text-[8px] sm:text-[11px] text-[#ffe600]">⚠️ JAKT PÅGÅR: TOMTEN!</div>
+            <div id="chaseStatusSub" class="text-[10px] sm:text-xs font-bold text-white mt-0.5">Skaka av honom i 13s!</div>
+            <div class="w-full h-1.5 sm:h-2 bg-[#130c2e] border border-[#ffe600] rounded-full overflow-hidden mt-1">
+                <div id="chaseTimerBar" class="h-full bg-gradient-to-r from-[#ffe600] to-[#00f0ff] w-full transition-all duration-75"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- STARTSKÄRM -->
+    <div id="startScreen" class="fixed inset-0 z-30 flex items-center justify-center p-3 sm:p-6 bg-[#0d0821]/75 backdrop-blur-xs overflow-y-auto">
+        <div class="retro-box rounded-2xl max-w-xl w-full p-5 sm:p-7 text-center my-auto">
+            <div class="inline-block px-3 py-1 rounded-full bg-[#ff2a85]/20 border border-[#ff2a85] text-[#00f0ff] font-pixel text-[9px] sm:text-[10px] mb-2">
+                ★ 1986 SWEDISH ARCADE EDITION ★
+            </div>
+            
+            <h1 class="retro-logo font-black text-4xl sm:text-6xl tracking-tight leading-none mb-2">
+                SNÖ PATRULLEN
+            </h1>
+            <p class="text-cyan-200 text-xs sm:text-sm mb-5 font-medium">
+                Kasta dig utför Lindvallens backar från grönt till svart, gör sjuka hopp, käka kanelbullar och skaka av dig skogens märkligaste förföljare!
+            </p>
+
+            <!-- Välj startbacke i Lindvallen -->
+            <div class="mb-4 text-left">
+                <label class="block font-pixel text-[10px] sm:text-xs text-[#00f0ff] mb-2 text-center">
+                    VÄLJ STARTBACKE I LINDVALLEN:
+                </label>
+                <div class="grid grid-cols-5 gap-1.5" id="slopeSelector">
+                    <button type="button" data-level="0" class="chaser-card selected rounded-lg p-2 flex flex-col items-center justify-center cursor-pointer">
+                        <span class="text-base">🟢</span>
+                        <span class="font-bold text-[10px] text-white text-center leading-tight mt-1">Lillvallen</span>
+                    </button>
+                    <button type="button" data-level="1" class="chaser-card rounded-lg p-2 flex flex-col items-center justify-center cursor-pointer">
+                        <span class="text-base">🟢</span>
+                        <span class="font-bold text-[10px] text-white text-center leading-tight mt-1">Snögubben</span>
+                    </button>
+                    <button type="button" data-level="2" class="chaser-card rounded-lg p-2 flex flex-col items-center justify-center cursor-pointer">
+                        <span class="text-base">🔵</span>
+                        <span class="font-bold text-[10px] text-white text-center leading-tight mt-1">Gustavbacken</span>
+                    </button>
+                    <button type="button" data-level="3" class="chaser-card rounded-lg p-2 flex flex-col items-center justify-center cursor-pointer">
+                        <span class="text-base">🔴</span>
+                        <span class="font-bold text-[10px] text-white text-center leading-tight mt-1">Karin</span>
+                    </button>
+                    <button type="button" data-level="4" class="chaser-card rounded-lg p-2 flex flex-col items-center justify-center cursor-pointer">
+                        <span class="text-base">⚫</span>
+                        <span class="font-bold text-[10px] text-white text-center leading-tight mt-1">Pernilla</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Kontroller & Tips -->
+            <div class="bg-[#0d0821]/80 border border-[#4a358f] rounded-xl p-3 mb-5 text-xs text-left grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <div class="flex items-center gap-2">
+                    <span class="bg-[#2b1055] border border-[#00f0ff] px-2 py-1 rounded font-pixel text-[9px] text-[#00f0ff]">◀ ▶</span>
+                    <span>Sväng vänster / höger</span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <span class="bg-[#2b1055] border border-[#00f0ff] px-2 py-1 rounded font-pixel text-[9px] text-[#00f0ff]">▲ ▼</span>
+                    <span>Bromsa / Öka farten</span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <span class="bg-[#2b1055] border border-[#ffe600] px-2 py-1 rounded font-pixel text-[9px] text-[#ffe600]">MELLANSLAG</span>
+                    <span>Hoppa & snurra i luften!</span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <span class="text-base">🥨☕</span>
+                    <span>Ger poäng, liv & Turbo!</span>
+                </div>
+            </div>
+
+            <!-- Highscore & Startknapp -->
+            <div class="flex flex-col sm:flex-row items-center justify-between gap-4">
+                <div class="text-center sm:text-left">
+                    <div class="font-pixel text-[9px] text-cyan-300">REKORD (HIGHSCORE)</div>
+                    <div id="startHighscore" class="font-pixel text-base sm:text-lg text-[#ffe600] mt-1">0 P</div>
+                </div>
+                <button id="startBtn" class="retro-btn w-full sm:w-auto px-8 py-4 rounded-xl font-pixel text-sm sm:text-base text-white tracking-wider cursor-pointer">
+                    ▶ STARTA ÅKET!
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- PAUSSKÄRM -->
+    <div id="pauseScreen" class="hidden fixed inset-0 z-30 flex items-center justify-center p-4 bg-[#0d0821]/80 backdrop-blur-xs">
+        <div class="retro-box rounded-2xl max-w-sm w-full p-6 text-center">
+            <h2 class="font-pixel text-2xl text-[#00f0ff] mb-3">PAUS</h2>
+            <p class="text-sm text-cyan-100 mb-6">Värmer pjäxorna vid liftstugan...</p>
+            <div class="flex flex-col gap-3">
+                <button id="resumeBtn" class="retro-btn py-3.5 rounded-xl font-pixel text-xs text-white cursor-pointer">
+                    ▶ FORTSÄTT ÅKA
+                </button>
+                <button id="quitBtn" class="py-3 rounded-xl bg-[#2b1055] border border-[#00f0ff] font-pixel text-xs text-cyan-200 hover:bg-[#3c1875] cursor-pointer">
+                    TILL STARTMENYN
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- GAME OVER / NIVÅ AVKLARAD SKÄRM -->
+    <div id="gameOverScreen" class="hidden fixed inset-0 z-30 flex items-center justify-center p-4 bg-[#0d0821]/85 backdrop-blur-xs">
+        <div class="retro-box rounded-2xl max-w-md w-full p-6 text-center">
+            <div id="endSubTitle" class="font-pixel text-xs text-[#ff2a85] mb-1">SLUT PÅ ÅKET!</div>
+            <h2 id="endMainTitle" class="retro-logo font-black text-3xl sm:text-4xl mb-2">SNÖPATRULLEN RÄDDAR DIG</h2>
+            <p id="gameOverReason" class="text-sm text-cyan-200 mb-5">Du tog en välförtjänt vila i en mjuk snödriva!</p>
+
+            <div class="bg-[#0d0821]/90 border border-[#00f0ff] rounded-xl p-4 mb-5 grid grid-cols-2 gap-3 text-center">
+                <div>
+                    <div class="font-pixel text-[9px] text-cyan-300">DIN POÄNG</div>
+                    <div id="finalScore" class="font-pixel text-lg text-[#ffe600] mt-1">0</div>
+                </div>
+                <div>
+                    <div class="font-pixel text-[9px] text-cyan-300">BACKE</div>
+                    <div id="finalDist" class="font-pixel text-xs sm:text-sm text-white mt-1">Lillvallen</div>
+                </div>
+                <div class="col-span-2 pt-2 border-t border-gray-800">
+                    <div class="font-pixel text-[9px] text-[#ff2a85]">BÄSTA REKORD</div>
+                    <div id="finalHighscore" class="font-pixel text-sm text-[#00f0ff] mt-1">0</div>
+                </div>
+            </div>
+
+            <div class="flex flex-col sm:flex-row gap-3">
+                <button id="nextLevelBtn" class="hidden retro-btn flex-1 py-4 rounded-xl font-pixel text-xs text-white cursor-pointer">
+                    ▶ NÄSTA BACKE!
+                </button>
+                <button id="restartBtn" class="retro-btn flex-1 py-4 rounded-xl font-pixel text-xs text-white cursor-pointer">
+                    ↻ ÅK IGEN!
+                </button>
+                <button id="menuBtn" class="py-4 px-4 rounded-xl bg-[#2b1055] border border-[#00f0ff] font-pixel text-xs text-cyan-200 hover:bg-[#3c1875] cursor-pointer">
+                    MENY
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MOBIL / TOUCH KONTROLLER -->
+    <div id="touchControls" class="hidden fixed bottom-3 left-3 right-3 z-20 flex items-end justify-between pointer-events-none sm:opacity-80">
+        <!-- Vänster/Höger styrning -->
+        <div class="flex gap-2 pointer-events-auto">
+            <button id="btnLeft" class="w-16 h-16 sm:w-14 sm:h-14 rounded-2xl bg-[#130c2e]/80 border-2 border-[#00f0ff] text-[#00f0ff] font-pixel text-xl flex items-center justify-center active:bg-[#00f0ff] active:text-[#0d0821] shadow-lg">
+                ◀
+            </button>
+            <button id="btnRight" class="w-16 h-16 sm:w-14 sm:h-14 rounded-2xl bg-[#130c2e]/80 border-2 border-[#00f0ff] text-[#00f0ff] font-pixel text-xl flex items-center justify-center active:bg-[#00f0ff] active:text-[#0d0821] shadow-lg">
+                ▶
+            </button>
+        </div>
+
+        <!-- Hopp / Trick knapp -->
+        <div class="pointer-events-auto">
+            <button id="btnJump" class="px-5 h-16 sm:h-14 rounded-2xl bg-[#ff2a85]/85 border-2 border-[#ffe600] text-[#ffe600] font-pixel text-xs flex items-center justify-center active:scale-95 shadow-lg">
+                HOPP!
+            </button>
+        </div>
+    </div>
+
+    <script>
+        /**
+         * ============================================================================
+         * SNÖ PATRULLEN - 80-tals Arkadskidspel
+         * Innehåller:
+         * 1. Web Audio API 80-tals Synthwave Musik & Ljudeffekt-motor
+         * 2. Canvas 2D Retro Vintermotor med partiklar, skidspår och pixel-art ritning
+         * 3. Förlåtande Ski or Die-mekanik (3 liv, odödlighetsblink, hopp/tricks, bull-turbo)
+         * 4. Tre unika svenska förföljare: Tomten, Dalahästen och Knasigt Troll
+         * ============================================================================
+         */
+
+        // --- 1. 80-TALS SYNTHWAVE LJUD- & MUSIKMOTOR (WEB AUDIO API) ---
+        class RetroSynthAudio {
+            constructor() {
+                this.ctx = null;
+                this.isMuted = false;
+                this.isPlaying = false;
+                this.tempo = 128; // BPM (ökar under jakt!)
+                this.step = 0;
+                this.timerId = null;
+                this.chaseMode = false;
+            }
+
+            init() {
+                if (!this.ctx) {
+                    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+                    this.ctx = new AudioCtx();
+                }
+                if (this.ctx.state === 'suspended') {
+                    this.ctx.resume();
+                }
+            }
+
+            toggleMute() {
+                this.isMuted = !this.isMuted;
+                if (this.isMuted) {
+                    this.stopMusic();
+                } else if (gameState.status === 'PLAYING') {
+                    this.startMusic();
+                }
+                return this.isMuted;
+            }
+
+            setChaseMode(active) {
+                this.chaseMode = active;
+                this.tempo = active ? 152 : 128;
+            }
+
+            startMusic() {
+                if (this.isMuted) return;
+                this.init();
+                if (this.isPlaying) return;
+                this.isPlaying = true;
+                this.step = 0;
+                this.scheduleNextStep();
+            }
+
+            stopMusic() {
+                this.isPlaying = false;
+                if (this.timerId) {
+                    clearTimeout(this.timerId);
+                    this.timerId = null;
+                }
+            }
+
+            scheduleNextStep() {
+                if (!this.isPlaying || this.isMuted) return;
+                
+                const sixteenthTime = (60 / this.tempo) / 4;
+                this.playStep(this.step);
+                this.step = (this.step + 1) % 32;
+
+                this.timerId = setTimeout(() => {
+                    this.scheduleNextStep();
+                }, sixteenthTime * 1000);
+            }
+
+            playStep(step) {
+                if (!this.ctx || this.isMuted) return;
+                const now = this.ctx.currentTime;
+
+                // 80-tals Synthwave Basgång (A-moll -> F -> G -> E-moll)
+                const bassNotesNormal = [
+                    110.00, 110.00, 220.00, 110.00, 110.00, 220.00, 110.00, 130.81, // Am
+                    87.31,  87.31,  174.61, 87.31,  87.31,  174.61, 87.31,  98.00,  // F
+                    98.00,  98.00,  196.00, 98.00,  98.00,  196.00, 98.00,  110.00, // G
+                    82.41,  82.41,  164.81, 82.41,  98.00,  98.00,  123.47, 130.81  // Em/G
+                ];
+
+                // Mer intensiv bas under jakt
+                const bassFreq = this.chaseMode ? bassNotesNormal[step] * 1.122 : bassNotesNormal[step];
+                this.triggerBass(bassFreq, now, 0.11);
+
+                // Trummor: Kick på 0, 4, 8, 12... 
